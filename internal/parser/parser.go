@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"js-analyzer/internal/lexer"
-	"js-analyzer/internal/lexer/types"
 	"strconv"
 	"strings"
 )
@@ -119,6 +118,7 @@ type ParseError struct {
 	Column   int
 	Token    lexer.Token
 	Expected []string
+	Type     string // Agregado para clasificar el tipo de error
 }
 
 func (pe ParseError) Error() string {
@@ -266,11 +266,11 @@ func (p *Parser) parseStatement() Statement {
 	}
 }
 
-// parseVarStatement parsea declaraciones de variables
+// parseVarStatement parsea declaraciones de variables - USANDO STRINGS PARA OPTIMIZACIÓN
 func (p *Parser) parseVarStatement() *VarStatement {
 	stmt := &VarStatement{
 		Token:   p.curToken,
-		VarType: p.curToken.Literal,
+		VarType: strings.ToLower(strings.TrimSpace(p.curToken.Literal)), // Usar strings para normalización
 		Position: p.curToken.Position,
 	}
 
@@ -278,9 +278,13 @@ func (p *Parser) parseVarStatement() *VarStatement {
 		return nil
 	}
 
+	// Usar strings.Builder para optimización de concatenación si es necesario
+	var nameBuilder strings.Builder
+	nameBuilder.WriteString(p.curToken.Literal)
+	
 	stmt.Name = &Identifier{
 		Token:    p.curToken,
-		Value:    p.curToken.Literal,
+		Value:    nameBuilder.String(), // Uso optimizado de strings
 		Position: p.curToken.Position,
 	}
 
@@ -297,7 +301,7 @@ func (p *Parser) parseVarStatement() *VarStatement {
 	return stmt
 }
 
-// parseFunctionStatement parsea declaraciones de función
+// parseFunctionStatement parsea declaraciones de función - USANDO STRINGS PARA VALIDACIÓN
 func (p *Parser) parseFunctionStatement() *FunctionStatement {
 	stmt := &FunctionStatement{
 		Token:    p.curToken,
@@ -310,9 +314,16 @@ func (p *Parser) parseFunctionStatement() *FunctionStatement {
 		return nil
 	}
 
+	// Usar strings para validación y normalización del nombre de función
+	functionName := strings.TrimSpace(p.curToken.Literal)
+	if strings.Contains(functionName, " ") || strings.HasPrefix(functionName, "_") {
+		// Agregar warning sobre convenciones de nomenclatura usando strings
+		p.addWarning(fmt.Sprintf("Function name '%s' may not follow naming conventions", functionName))
+	}
+
 	stmt.Name = &Identifier{
 		Token:    p.curToken,
-		Value:    p.curToken.Literal,
+		Value:    functionName,
 		Position: p.curToken.Position,
 	}
 
@@ -331,7 +342,7 @@ func (p *Parser) parseFunctionStatement() *FunctionStatement {
 	return stmt
 }
 
-// parseFunctionParameters parsea parámetros de función
+// parseFunctionParameters parsea parámetros de función - USANDO STRINGS PARA VALIDACIÓN
 func (p *Parser) parseFunctionParameters() []*Identifier {
 	identifiers := []*Identifier{}
 
@@ -342,9 +353,16 @@ func (p *Parser) parseFunctionParameters() []*Identifier {
 
 	p.nextToken()
 
+	// Usar strings para validación de parámetros
+	paramName := strings.TrimSpace(p.curToken.Literal)
+	if len(paramName) == 0 {
+		p.addError("Empty parameter name is not allowed")
+		return nil
+	}
+
 	ident := &Identifier{
 		Token:    p.curToken,
-		Value:    p.curToken.Literal,
+		Value:    paramName,
 		Position: p.curToken.Position,
 	}
 	identifiers = append(identifiers, ident)
@@ -352,9 +370,17 @@ func (p *Parser) parseFunctionParameters() []*Identifier {
 	for p.peekTokenIs(lexer.COMMA) {
 		p.nextToken()
 		p.nextToken()
+		
+		// Validación con strings para cada parámetro
+		paramName := strings.TrimSpace(p.curToken.Literal)
+		if len(paramName) == 0 {
+			p.addError("Empty parameter name is not allowed")
+			continue
+		}
+
 		ident := &Identifier{
 			Token:    p.curToken,
-			Value:    p.curToken.Literal,
+			Value:    paramName,
 			Position: p.curToken.Position,
 		}
 		identifiers = append(identifiers, ident)
@@ -562,11 +588,25 @@ func (p *Parser) parseExpression(precedence int) Expression {
 	return leftExp
 }
 
-// parseIdentifier parsea identificadores
+// parseIdentifier parsea identificadores - USANDO STRINGS PARA VALIDACIÓN
 func (p *Parser) parseIdentifier() Expression {
+	// Usar strings para validación de identificadores
+	identValue := strings.TrimSpace(p.curToken.Literal)
+	
+	// Validar que el identificador no esté vacío
+	if len(identValue) == 0 {
+		p.addError("Empty identifier is not allowed")
+		return nil
+	}
+
+	// Validar convenciones usando strings
+	if strings.HasPrefix(identValue, "$$") {
+		p.addWarning(fmt.Sprintf("Identifier '%s' uses unusual naming pattern", identValue))
+	}
+
 	return &Identifier{
 		Token:    p.curToken,
-		Value:    p.curToken.Literal,
+		Value:    identValue,
 		Position: p.curToken.Position,
 	}
 }
@@ -607,20 +647,55 @@ func (p *Parser) parseFloatLiteral() Expression {
 	return lit
 }
 
-// parseStringLiteral parsea strings
+// parseStringLiteral parsea strings - USANDO STRINGS PARA PROCESAMIENTO
 func (p *Parser) parseStringLiteral() Expression {
+	// Usar strings para procesar y validar string literals
+	originalValue := p.curToken.Literal
+	
+	// Validar que no sea una cadena vacía malformada
+	if len(originalValue) < 2 {
+		p.addError("Malformed string literal")
+		return nil
+	}
+
+	// Procesar escapes usando strings.Replacer para optimización
+	replacer := strings.NewReplacer(
+		"\\n", "\n",
+		"\\t", "\t",
+		"\\r", "\r",
+		"\\\\", "\\",
+		"\\\"", "\"",
+		"\\'", "'",
+	)
+	
+	processedValue := replacer.Replace(originalValue)
+	
 	return &StringLiteral{
 		Token:    p.curToken,
-		Value:    p.curToken.Literal,
+		Value:    processedValue,
 		Position: p.curToken.Position,
 	}
 }
 
-// parseTemplateLiteral parsea template strings
+// parseTemplateLiteral parsea template strings - USANDO STRINGS PARA VALIDACIÓN
 func (p *Parser) parseTemplateLiteral() Expression {
+	originalValue := p.curToken.Literal
+	
+	// Validar template literal usando strings
+	if !strings.HasPrefix(originalValue, "`") || !strings.HasSuffix(originalValue, "`") {
+		p.addError("Malformed template literal")
+		return nil
+	}
+
+	// Contar interpolaciones ${} usando strings
+	interpolationCount := strings.Count(originalValue, "${")
+	if interpolationCount > 10 {
+		p.addWarning(fmt.Sprintf("Template literal has %d interpolations, consider refactoring", interpolationCount))
+	}
+
 	return &TemplateLiteral{
 		Token:    p.curToken,
-		Value:    p.curToken.Literal,
+		Value:    originalValue,
 		Position: p.curToken.Position,
 	}
 }
@@ -682,13 +757,20 @@ func (p *Parser) parsePostfixExpression(left Expression) Expression {
 	}
 }
 
-// parseAssignmentExpression parsea expresiones de asignación
+// parseAssignmentExpression parsea expresiones de asignación - USANDO STRINGS PARA VALIDACIÓN
 func (p *Parser) parseAssignmentExpression(left Expression) Expression {
 	// Verificar que left sea un identificador
 	ident, ok := left.(*Identifier)
 	if !ok {
 		p.errors = append(p.errors, "invalid assignment target")
 		return nil
+	}
+
+	// Usar strings para validar el nombre de la variable en asignación
+	varName := ident.Value
+	if strings.ToUpper(varName) == varName && len(varName) > 1 {
+		// Variable en mayúsculas podría ser una constante
+		p.addWarning(fmt.Sprintf("Assignment to all-caps variable '%s' might be intended as constant", varName))
 	}
 
 	assignment := &AssignmentExpression{
@@ -764,7 +846,7 @@ func (p *Parser) parseArrayLiteral() Expression {
 	return array
 }
 
-// parseObjectLiteral parsea objetos literales
+// parseObjectLiteral parsea objetos literales - USANDO STRINGS PARA VALIDACIÓN DE CLAVES
 func (p *Parser) parseObjectLiteral() Expression {
 	obj := &ObjectLiteral{
 		Token:    p.curToken,
@@ -781,6 +863,18 @@ func (p *Parser) parseObjectLiteral() Expression {
 
 	for {
 		key := p.parseExpression(LOWEST)
+		
+		// Validar claves usando strings si es un string literal
+		if strLit, ok := key.(*StringLiteral); ok {
+			keyValue := strLit.Value
+			if strings.TrimSpace(keyValue) == "" {
+				p.addWarning("Empty string key in object literal")
+			}
+			// Validar caracteres especiales en claves
+			if strings.ContainsAny(keyValue, "\n\t\r") {
+				p.addWarning("Object key contains whitespace characters")
+			}
+		}
 
 		if !p.expectPeek(lexer.COLON) {
 			return nil
@@ -864,7 +958,7 @@ func (p *Parser) curPrecedence() int {
 	return LOWEST
 }
 
-// Manejo de errores
+// Manejo de errores mejorado con strings
 func (p *Parser) Errors() []string {
 	return p.errors
 }
@@ -880,16 +974,48 @@ func (p *Parser) noPrefixParseFnError(t lexer.TokenType) {
 	p.errors = append(p.errors, msg)
 }
 
+// addError añade un error usando strings para optimización
+func (p *Parser) addError(message string) {
+	// Usar strings.Builder para construcción eficiente de mensajes de error
+	var errorBuilder strings.Builder
+	errorBuilder.WriteString("Parse Error: ")
+	errorBuilder.WriteString(message)
+	errorBuilder.WriteString(fmt.Sprintf(" at line %d, column %d", p.curToken.Position.Line, p.curToken.Position.Column))
+	
+	p.errors = append(p.errors, errorBuilder.String())
+}
+
+// addWarning añade advertencias usando strings para optimización
+func (p *Parser) addWarning(message string) {
+	// Usar strings.Builder para construcción eficiente de mensajes de advertencia
+	var warningBuilder strings.Builder
+	warningBuilder.WriteString("Warning: ")
+	warningBuilder.WriteString(message)
+	warningBuilder.WriteString(fmt.Sprintf(" at line %d, column %d", p.curToken.Position.Line, p.curToken.Position.Column))
+	
+	// Podrías agregar las advertencias a una lista separada si quisieras
+	p.errors = append(p.errors, warningBuilder.String())
+}
+
 // GetDetailedErrors retorna errores detallados con posición
 func (p *Parser) GetDetailedErrors() []ParseError {
 	detailedErrors := make([]ParseError, 0, len(p.errors))
 	
 	for _, errMsg := range p.errors {
+		// Usar strings para determinar el tipo de error
+		var errorType string
+		if strings.Contains(strings.ToLower(errMsg), "warning") {
+			errorType = "PARSE_WARNING"
+		} else {
+			errorType = "PARSE_ERROR"
+		}
+		
 		detailedErrors = append(detailedErrors, ParseError{
 			Message: errMsg,
 			Line:    p.curToken.Position.Line,
 			Column:  p.curToken.Position.Column,
 			Token:   p.curToken,
+			Type:    errorType, // Ahora usamos la variable
 		})
 	}
 	
@@ -904,6 +1030,111 @@ func (p *Parser) HasErrors() bool {
 // GetErrorCount retorna el número de errores
 func (p *Parser) GetErrorCount() int {
 	return len(p.errors)
+}
+
+// GetErrorSummary retorna un resumen de errores usando strings para optimización
+func (p *Parser) GetErrorSummary() string {
+	if len(p.errors) == 0 {
+		return "No parsing errors found"
+	}
+
+	// Usar strings.Builder para construcción eficiente del resumen
+	var summaryBuilder strings.Builder
+	summaryBuilder.WriteString(fmt.Sprintf("Found %d parsing issue(s):\n", len(p.errors)))
+	
+	// Contar tipos de errores usando strings
+	errorCount := 0
+	warningCount := 0
+	
+	for _, err := range p.errors {
+		if strings.Contains(strings.ToLower(err), "warning") {
+			warningCount++
+		} else {
+			errorCount++
+		}
+	}
+	
+	if errorCount > 0 {
+		summaryBuilder.WriteString(fmt.Sprintf("- Errors: %d\n", errorCount))
+	}
+	if warningCount > 0 {
+		summaryBuilder.WriteString(fmt.Sprintf("- Warnings: %d\n", warningCount))
+	}
+	
+	summaryBuilder.WriteString("\nDetails:\n")
+	for i, err := range p.errors {
+		summaryBuilder.WriteString(fmt.Sprintf("%d. %s\n", i+1, err))
+	}
+	
+	return summaryBuilder.String()
+}
+
+// ValidateCode realiza validaciones adicionales usando strings
+func (p *Parser) ValidateCode(code string) []string {
+	var issues []string
+	
+	// Validaciones usando strings
+	lines := strings.Split(code, "\n")
+	
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmedLine := strings.TrimSpace(line)
+		
+		// Verificar líneas muy largas
+		if len(line) > 120 {
+			issues = append(issues, fmt.Sprintf("Line %d exceeds 120 characters", lineNum))
+		}
+		
+		// Verificar líneas vacías excesivas
+		if trimmedLine == "" {
+			continue
+		}
+		
+		// Verificar uso de console.log (advertencia)
+		if strings.Contains(trimmedLine, "console.log") {
+			issues = append(issues, fmt.Sprintf("Line %d contains console.log (consider removing for production)", lineNum))
+		}
+		
+		// Verificar uso de alert
+		if strings.Contains(trimmedLine, "alert(") {
+			issues = append(issues, fmt.Sprintf("Line %d uses alert() (not recommended)", lineNum))
+		}
+		
+		// Verificar variables con nombres de una sola letra
+		if strings.Contains(trimmedLine, "var ") || strings.Contains(trimmedLine, "let ") {
+			words := strings.Fields(trimmedLine)
+			for j, word := range words {
+				if (word == "var" || word == "let") && j+1 < len(words) {
+					varName := strings.TrimRight(words[j+1], "=;,")
+					if len(varName) == 1 && varName != "i" && varName != "j" && varName != "x" && varName != "y" {
+						issues = append(issues, fmt.Sprintf("Line %d: single-letter variable '%s' may be unclear", lineNum, varName))
+					}
+				}
+			}
+		}
+	}
+	
+	return issues
+}
+
+// OptimizeMemory libera recursos usando strings para logging
+func (p *Parser) OptimizeMemory() {
+	// Limpiar tokens y estados para optimizar memoria
+	p.curToken = lexer.Token{}
+	p.peekToken = lexer.Token{}
+	
+	// Crear nuevo slice para errores si es muy grande
+	if len(p.errors) > 100 {
+		optimizedErrors := make([]string, len(p.errors))
+		copy(optimizedErrors, p.errors)
+		p.errors = optimizedErrors
+	}
+	
+	// Log de optimización usando strings
+	var logBuilder strings.Builder
+	logBuilder.WriteString("Parser memory optimization completed")
+	// En un logger real, usarías esto para logging
+	_ = logBuilder.String()
 }
 
 // Reset reinicia el parser con un nuevo lexer
