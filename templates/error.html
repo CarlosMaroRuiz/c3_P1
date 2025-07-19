@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❌</text></svg>">
+    <style>
+        .error-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            padding: 20px;
+        }
+        
+        .error-container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        .error-title {
+            color: #e74c3c;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .error-message {
+            color: #2c3e50;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .error-details {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .error-details h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .error-details pre {
+            color: #6c757d;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .error-actions {
+            margin-top: 30px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+        
+        .error-tips {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e8f5e8;
+            border-left: 4px solid #28a745;
+            border-radius: 4px;
+            text-align: left;
+        }
+        
+        .error-tips h4 {
+            color: #155724;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .error-tips ul {
+            color: #155724;
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .error-tips li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        
+        @media (max-width: 768px) {
+            .error-container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+            
+            .error-title {
+                font-size: 2rem;
+            }
+            
+            .error-message {
+                font-size: 1.1rem;
+            }
+            
+            .btn {
+                display: block;
+                margin: 10px 0;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-page">
+        <div class="error-container">
+            <span class="error-icon">❌</span>
+            
+            <h1 class="error-title">¡Oops! Algo salió mal</h1>
+            
+            <p class="error-message">{{.Message}}</p>
+            
+            {{if .Error}}
+            <div class="error-details">
+                <h3>Detalles del Error:</h3>
+                <pre>{{.Error}}</pre>
+            </div>
+            {{end}}
+            
+            <div class="error-actions">
+                <a href="/" class="btn btn-primary">
+                    🏠 Volver al Inicio
+                </a>
+                <button onclick="history.back()" class="btn btn-secondary">
+                    ⬅️ Página Anterior
+                </button>
+            </div>
+            
+            <div class="error-tips">
+                <h4>💡 Sugerencias para resolver este problema:</h4>
+                <ul>
+                    <li>Verifica que el código JavaScript ingresado sea válido</li>
+                    <li>Asegúrate de que el tamaño del código no exceda el límite permitido</li>
+                    <li>Intenta con un ejemplo más simple para verificar el funcionamiento</li>
+                    <li>Si el problema persiste, verifica el estado del servicio</li>
+                    <li>Considera contactar al administrador del sistema</li>
+                </ul>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+                <p style="color: #6c757d; font-size: 0.9rem; margin: 0;">
+                    JavaScript Code Analyzer v1.0.0 <br>
+                    <a href="/health" style="color: #007bff; text-decoration: none;">Estado del Servicio</a> |
+                    <a href="/api/health" style="color: #007bff; text-decoration: none;">API Health</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-reload en caso de errores de conexión temporales
+        if (navigator.onLine === false) {
+            window.addEventListener('online', () => {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            });
+        }
+        
+        // Manejar errores de JavaScript en la página
+        window.addEventListener('error', (e) => {
+            console.error('Error en la página:', e.error);
+        });
+        
+        // Añadir efecto de fade-in
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.querySelector('.error-container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            container.style.transition = 'all 0.6s ease';
+            
+            setTimeout(() => {
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
+</body>
+</html>

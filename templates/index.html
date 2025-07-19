@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔍 JavaScript Code Analyzer</h1>
+            <p>Análisis léxico, sintáctico y semántico de código JavaScript</p>
+        </header>
+
+        {{if .Error}}
+        <div class="alert alert-error">
+            <strong>Error:</strong> {{.Error}}
+        </div>
+        {{end}}
+
+        <div class="main-content">
+            <div class="input-section">
+                <form id="analyzeForm" method="POST" action="/">
+                    <div class="form-group">
+                        <label for="code">Código JavaScript:</label>
+                        <textarea 
+                            id="code" 
+                            name="code" 
+                            rows="15" 
+                            placeholder="Ingresa tu código JavaScript aquí..."
+                            maxlength="{{.Config.maxCodeSize}}"
+                            required>{{if .Result}}{{.Result.Code}}{{end}}</textarea>
+                        <div class="char-counter">
+                            <span id="charCount">0</span> / {{.Config.maxCodeSize}} caracteres
+                        </div>
+                    </div>
+
+                    <div class="analysis-options">
+                        <div class="option-group">
+                            <label for="analysis_type">Tipo de Análisis:</label>
+                            <select id="analysis_type" name="analysis_type">
+                                <option value="0">Solo Léxico</option>
+                                <option value="1">Solo Sintáctico</option>
+                                <option value="2">Solo Semántico</option>
+                                <option value="3" selected>Análisis Completo</option>
+                            </select>
+                        </div>
+
+                        <div class="option-group">
+                            <label>Mostrar Resultados:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="show_tokens" {{if .Result}}{{if .Result.Tokens}}checked{{end}}{{end}}>
+                                    <span>Tokens</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="show_ast" {{if .Result}}{{if .Result.AST}}checked{{end}}{{end}}>
+                                    <span>AST</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="show_symbols" {{if .Result}}{{if .Result.Symbols}}checked{{end}}{{end}}>
+                                    <span>Símbolos</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <label>Opciones Adicionales:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="skip_comments">
+                                    <span>Omitir Comentarios</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="strict_mode">
+                                    <span>Modo Estricto</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="enable_optimizations">
+                                    <span>Optimizaciones</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="btn-icon">🔍</span>
+                            Analizar Código
+                        </button>
+                        <button type="button" id="clearBtn" class="btn btn-secondary">
+                            <span class="btn-icon">🗑️</span>
+                            Limpiar
+                        </button>
+                    </div>
+                </form>
+
+                <div class="examples-section">
+                    <h3>📚 Ejemplos de Código</h3>
+                    <div class="examples-grid">
+                        {{range .Examples}}
+                        <div class="example-card" data-code="{{.Code}}">
+                            <h4>{{.Name}}</h4>
+                            <p>{{.Description}}</p>
+                            <div class="example-meta">
+                                <span class="badge badge-{{.Category}}">{{.Category}}</span>
+                                <span class="badge badge-{{.Difficulty}}">{{.Difficulty}}</span>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+
+            {{if .Result}}
+            <div class="results-section">
+                <div class="results-header">
+                    <h2>📊 Resultados del Análisis</h2>
+                    <div class="analysis-status {{if .Result.Success}}success{{else}}error{{end}}">
+                        {{if .Result.Success}}✅ Análisis Exitoso{{else}}❌ Análisis con Errores{{end}}
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <h3>📋 Resumen</h3>
+                    <div class="summary-content">
+                        <pre>{{.Result.Summary}}</pre>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{formatTime .Result.ExecutionTime}}</div>
+                            <div class="stat-label">Tiempo de Ejecución</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔤</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{.Result.TokenCount}}</div>
+                            <div class="stat-label">Tokens</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📄</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{.Result.LineCount}}</div>
+                            <div class="stat-label">Líneas</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{.Result.Statistics.Variables}}</div>
+                            <div class="stat-label">Variables</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{.Result.Statistics.Functions}}</div>
+                            <div class="stat-label">Funciones</div>
+                        </div>
+                    </div>
+                    <div class="stat-card {{complexityClass .Result.Statistics.Complexity}}">
+                        <div class="stat-icon">🧮</div>
+                        <div class="stat-content">
+                            <div class="stat-value">{{formatComplexity .Result.Statistics.Complexity}}</div>
+                            <div class="stat-label">Complejidad</div>
+                        </div>
+                    </div>
+                </div>
+
+                {{if .Result.Statistics.Variables}}
+                <div class="coverage-card {{coverageClass .Result.Statistics.CoveragePercent}}">
+                    <h3>📊 Cobertura de Variables</h3>
+                    <div class="coverage-bar">
+                        <div class="coverage-fill" style="width: {{formatCoverage .Result.Statistics.CoveragePercent}}"></div>
+                    </div>
+                    <div class="coverage-text">{{formatCoverage .Result.Statistics.CoveragePercent}} de variables utilizadas</div>
+                </div>
+                {{end}}
+
+                {{if .Result.LexicalErrors}}
+                <div class="error-section">
+                    <h3>🔤 Errores Léxicos ({{len .Result.LexicalErrors}})</h3>
+                    <div class="error-list">
+                        {{range $index, $error := .Result.LexicalErrors}}
+                        <div class="error-item {{errorClass $error.Severity}}">
+                            <div class="error-header">
+                                <span class="error-type">{{$error.Type}}</span>
+                                <span class="error-position">Línea {{$error.Position.Line}}, Col {{$error.Position.Column}}</span>
+                            </div>
+                            <div class="error-message">{{$error.Message}}</div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .Result.SyntacticErrors}}
+                <div class="error-section">
+                    <h3>🌳 Errores Sintácticos ({{len .Result.SyntacticErrors}})</h3>
+                    <div class="error-list">
+                        {{range $index, $error := .Result.SyntacticErrors}}
+                        <div class="error-item {{errorClass $error.Severity}}">
+                            <div class="error-header">
+                                <span class="error-type">{{$error.Type}}</span>
+                                <span class="error-position">Línea {{$error.Position.Line}}, Col {{$error.Position.Column}}</span>
+                            </div>
+                            <div class="error-message">{{$error.Message}}</div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .Result.SemanticErrors}}
+                <div class="error-section">
+                    <h3>🧠 Problemas Semánticos ({{len .Result.SemanticErrors}})</h3>
+                    <div class="error-list">
+                        {{range $index, $error := .Result.SemanticErrors}}
+                        <div class="error-item {{errorClass $error.Severity}}">
+                            <div class="error-header">
+                                <span class="error-type">{{$error.Type}}</span>
+                                <span class="error-position">Línea {{$error.Position.Line}}, Col {{$error.Position.Column}}</span>
+                                {{if $error.Symbol}}<span class="error-symbol">{{$error.Symbol}}</span>{{end}}
+                            </div>
+                            <div class="error-message">{{$error.Message}}</div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .Result.Warnings}}
+                <div class="warning-section">
+                    <h3>⚠️ Advertencias ({{len .Result.Warnings}})</h3>
+                    <div class="warning-list">
+                        {{range $index, $warning := .Result.Warnings}}
+                        <div class="warning-item">
+                            <span class="warning-icon">⚠️</span>
+                            <span class="warning-text">{{$warning}}</span>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .Result.Tokens}}
+                <div class="tokens-section">
+                    <h3>🔤 Tokens ({{len .Result.Tokens}})</h3>
+                    <div class="tokens-container">
+                        <div class="tokens-grid">
+                            {{range $index, $token := .Result.Tokens}}
+                            <div class="token-item {{tokenCategoryClass $token.Category}}">
+                                <div class="token-header">
+                                    <span class="token-type">{{$token.Type}}</span>
+                                    <span class="token-position">{{$token.Position.Line}}:{{$token.Position.Column}}</span>
+                                </div>
+                                <div class="token-literal">{{$token.Literal}}</div>
+                                <div class="token-meta">
+                                    <span class="token-category">{{$token.Category}}</span>
+                                    {{if $token.IsKeyword}}<span class="token-flag">Keyword</span>{{end}}
+                                    {{if $token.IsOperator}}<span class="token-flag">Operator</span>{{end}}
+                                    {{if $token.IsLiteral}}<span class="token-flag">Literal</span>{{end}}
+                                </div>
+                            </div>
+                            {{end}}
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .Result.AST}}
+                <div class="ast-section">
+                    <h3>🌳 Árbol Sintáctico Abstracto</h3>
+                    <div class="ast-container">
+                        <pre class="ast-json">{{formatJSON .Result.AST}}</pre>
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .Result.Symbols}}
+                <div class="symbols-section">
+                    <h3>📋 Tabla de Símbolos ({{len .Result.Symbols}})</h3>
+                    <div class="symbols-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Tipo</th>
+                                    <th>Scope</th>
+                                    <th>Posición</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $index, $symbol := .Result.Symbols}}
+                                <tr class="{{symbolTypeClass $symbol.Type}}">
+                                    <td class="symbol-name">{{$symbol.Name}}</td>
+                                    <td class="symbol-type">{{$symbol.Type}}</td>
+                                    <td class="symbol-scope">{{$symbol.Scope}}</td>
+                                    <td class="symbol-position">{{$symbol.Position.Line}}:{{$symbol.Position.Column}}</td>
+                                    <td class="symbol-status">
+                                        {{if $symbol.Used}}
+                                            <span class="status-used">✓ Usado</span>
+                                        {{else}}
+                                            <span class="status-unused">⚠ No usado</span>
+                                        {{end}}
+                                        {{if $symbol.ReadOnly}}
+                                            <span class="status-readonly">🔒 ReadOnly</span>
+                                        {{end}}
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2025 JavaScript Code Analyzer - Análisis de código JavaScript en tiempo real</p>
+            <div class="footer-links">
+                <a href="/health">Estado del Servicio</a>
+                <a href="/api/health">API Health</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
